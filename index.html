@@ -1,1 +1,1365 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Responsive Device Studio</title>
+  <meta name="description" content="Single HTML responsive device studio using remote frames and screenshot API." />
+  <style>
+:root {
+  --bg: #0f1014;
+  --bg-soft: #17191f;
+  --panel: rgba(255,255,255,0.08);
+  --panel-soft: rgba(255,255,255,0.05);
+  --panel-strong: rgba(255,255,255,0.1);
+  --line: rgba(255,255,255,0.1);
+  --text: #f3f5f9;
+  --muted: #b5bbc7;
+  --green: #57d98d;
+  --blue: #67a6ff;
+  --shadow: 0 20px 60px rgba(0,0,0,.28);
+  --r-xl: 28px;
+  --r-lg: 22px;
+  --r-md: 18px;
+  --r-sm: 14px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: var(--text); background: radial-gradient(circle at top left, rgba(103,166,255,0.07), transparent 22%), radial-gradient(circle at bottom right, rgba(87,217,141,0.06), transparent 22%), #0f1014; }
+body { overflow: hidden; }
+button, input { font: inherit; }
+a { color: inherit; text-decoration: none; }
+img { display: block; }
+
+.glass {
+  background: linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0.05));
+  border: 1px solid var(--line);
+  backdrop-filter: blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+  box-shadow: var(--shadow);
+}
+.glass-soft {
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.04));
+  border: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(14px) saturate(120%);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+}
+
+.app {
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 14px;
+  padding: 14px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+  padding: 8px 10px;
+  border-radius: 18px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.brand-mark {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  background: linear-gradient(135deg, #6fb5ff, #59d98c);
+  color: #fff;
+  box-shadow: 0 12px 30px rgba(103,166,255,.25);
+}
+.brand-text strong { display: block; font-size: .95rem; }
+.brand-text span { display: block; color: var(--muted); font-size: .78rem; }
+.urlbar {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+.urlbar input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 36px;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  outline: none;
+  padding: 0 6px;
+}
+.urlbar input::placeholder { color: #97a0af; }
+.top-actions { display: flex; gap: 10px; }
+.btn {
+  height: 36px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: transform .16s ease, background .16s ease, border-color .16s ease;
+}
+.btn:hover { transform: translateY(-1px); border-color: rgba(255,255,255,.18); }
+.btn-primary { background: linear-gradient(135deg, #5fa7ff, #7f83ff); }
+.btn-icon { width: 42px; padding: 0; }
+
+.workspace {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 58px 1fr 360px;
+  gap: 10px;
+}
+
+.toolbar {
+  border-radius: 20px;
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.tool-sep {
+  width: 34px;
+  height: 1px;
+  background: rgba(255,255,255,.09);
+  margin: 4px 0;
+}
+.tool-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.1);
+  background: rgba(255,255,255,.04);
+  color: #dbe2ee;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform .16s ease, background .16s ease, border-color .16s ease;
+}
+.tool-btn:hover { transform: translateY(-1px); border-color: rgba(255,255,255,.18); }
+.tool-btn.active { background: rgba(103,166,255,.18); border-color: rgba(103,166,255,.35); color: #fff; }
+.tool-btn.recording { background: rgba(230,68,87,.18); border-color: rgba(230,68,87,.35); }
+.tool-btn svg { width: 22px; height: 22px; }
+
+.stage {
+  min-width: 0;
+  min-height: 0;
+  border-radius: 22px;
+  position: relative;
+  overflow: hidden;
+  display: block;
+}
+.stage-head {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+}
+.stage-title strong { display: block; font-size: .96rem; }
+.stage-title span { display: block; color: var(--muted); font-size: .8rem; margin-top: 3px; }
+.stage-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+.pill {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.05);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: .76rem;
+}
+
+.stage-body {
+  min-height: 0;
+  position: relative;
+  overflow: auto;
+  background: radial-gradient(circle at top left, rgba(255,255,255,0.05), transparent 18%), radial-gradient(circle at bottom right, rgba(103,166,255,.08), transparent 22%), #16181e;
+}
+.stage-body.checker {
+  background-color: #16181e;
+  background-image: linear-gradient(45deg, rgba(255,255,255,.035) 25%, transparent 25%), linear-gradient(-45deg, rgba(255,255,255,.035) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, rgba(255,255,255,.035) 75%), linear-gradient(-45deg, transparent 75%, rgba(255,255,255,.035) 75%);
+  background-size: 26px 26px;
+  background-position: 0 0, 0 13px, 13px -13px, -13px 0;
+}
+.center-wrap {
+  min-height: 100%;
+  min-width: max-content;
+  display: block;
+  padding: 12px;
+  text-align: center;
+}
+.preview-wrap {
+  position: relative;
+  display: inline-block;
+  vertical-align: top;
+}
+.preview-shell {
+  position: relative;
+  display: inline-block;
+}
+.preview-shell.no-frame {
+  background: rgba(0,0,0,.18);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 24px;
+  padding: 10px;
+}
+.preview-screen {
+  position: absolute;
+  overflow: hidden;
+  background: #fff;
+}
+.preview-screen img,
+.preview-flat img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  user-select: none;
+  -webkit-user-drag: none;
+  opacity: 0;
+  transition: opacity .16s ease;
+}
+.preview-screen img.is-ready,
+.preview-flat img.is-ready {
+  opacity: 1;
+}
+.preview-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+}
+.preview-frame.rotated {
+  width: auto;
+  height: auto;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(90deg);
+  transform-origin: center center;
+}
+.preview-flat {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  background: #fff;
+}
+.loading-layer,
+.error-layer {
+  position: absolute;
+  inset: auto 14px 14px auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0;
+  pointer-events: none;
+}
+.loading-layer span,
+.error-layer span {
+  color: #e9efff;
+  font-size: .8rem;
+  line-height: 1.4;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(10,12,15,.76);
+  border: 1px solid rgba(255,255,255,.08);
+  max-width: min(320px, calc(100vw - 120px));
+}
+.error-layer span { color: #ffcad3; }
+
+.panel {
+  min-height: 0;
+  border-radius: 22px;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  overflow: hidden;
+  transition: transform .22s ease, opacity .22s ease;
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+}
+.panel-head strong { font-size: .9rem; }
+.panel-head span { color: var(--muted); font-size: .78rem; display: block; margin-top: 4px; }
+.close-panel { display: none; }
+.panel-search {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+}
+.searchbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.04);
+  border-radius: 16px;
+  padding: 0 12px;
+}
+.searchbox input {
+  width: 100%;
+  height: 42px;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  outline: none;
+}
+.custom-form {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 88px 88px;
+  gap: 10px;
+}
+.custom-form input,
+.custom-form select {
+  width: 100%;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.04);
+  color: var(--text);
+  padding: 0 12px;
+  outline: none;
+}
+.custom-form .full { grid-column: 1 / -1; }
+.custom-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 10px;
+}
+.custom-actions .btn {
+  height: 40px;
+  flex: 1 1 0;
+}
+.device-scroll {
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 14px 14px;
+}
+.group { margin-bottom: 16px; }
+.group:last-child { margin-bottom: 0; }
+.group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #d8dee9;
+  font-size: .82rem;
+  margin-bottom: 10px;
+  position: sticky;
+  top: 0;
+  padding: 6px 0;
+  background: linear-gradient(180deg, rgba(20,22,29,0.95), rgba(20,22,29,0.82));
+  backdrop-filter: blur(8px);
+  z-index: 2;
+}
+.device-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+.device-card {
+  border: 1px solid rgba(0,0,0,.08);
+  background: rgba(255,255,255,.92);
+  color: #2c313a;
+  border-radius: 10px;
+  padding: 10px 8px 8px;
+  min-height: 74px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  cursor: pointer;
+  position: relative;
+}
+.device-card.active {
+  box-shadow: inset 0 0 0 2px #5fa7ff;
+  background: #fff;
+}
+.device-card.custom::after {
+  content: 'Custom';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: .52rem;
+  color: #fff;
+  background: #5fa7ff;
+  border-radius: 999px;
+  padding: 2px 5px;
+}
+.device-card img {
+  width: 22px;
+  height: 34px;
+  object-fit: contain;
+}
+.device-card .label {
+  font-size: .68rem;
+  line-height: 1.15;
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.panel-hidden .panel {
+  transform: translateX(16px);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.helper-note {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(10,12,15,.7);
+  border: 1px solid rgba(255,255,255,.08);
+  color: #d9dfeb;
+  font-size: .78rem;
+  line-height: 1.4;
+  max-width: min(320px, calc(100% - 32px));
+}
+.export-menu {
+  position: fixed;
+  left: 92px;
+  bottom: 88px;
+  z-index: 60;
+  width: min(280px, calc(100vw - 120px));
+  border-radius: 18px;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+.export-menu strong {
+  font-size: .86rem;
+}
+.export-menu .row {
+  display: grid;
+  gap: 8px;
+}
+.export-menu label {
+  font-size: .76rem;
+  color: var(--muted);
+}
+.export-menu select {
+  width: 100%;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.04);
+  color: var(--text);
+  padding: 0 12px;
+  outline: none;
+}
+.export-menu .actions {
+  display: flex;
+  gap: 10px;
+}
+.export-menu .actions .btn { flex: 1 1 0; height: 40px; }
+
+.hidden { display: none !important; }
+
+@media (max-width: 1180px) {
+  .workspace { grid-template-columns: 54px 1fr; }
+  .panel-host { position: fixed; inset: 62px 10px 10px auto; width: min(360px, calc(100vw - 74px)); z-index: 40; }
+  .panel { height: 100%; }
+  .close-panel { display: inline-flex; }
+}
+@media (max-width: 760px) {
+  .app { padding: 8px; gap: 8px; }
+  .topbar { padding: 6px 8px; gap: 8px; }
+  .brand-text { display: none; }
+  .brand-mark { width: 32px; height: 32px; border-radius: 10px; }
+  .urlbar { padding: 4px; }
+  .urlbar input { height: 34px; }
+  .top-actions { display: none; }
+  .workspace { gap: 8px; grid-template-columns: 50px 1fr; }
+  .toolbar { border-radius: 18px; padding: 6px 4px; }
+  .tool-btn { width: 36px; height: 36px; border-radius: 12px; }
+  .stage, .panel { border-radius: 18px; }
+  .center-wrap { padding: 10px; }
+  .panel-host { inset: 54px 8px 8px auto; width: min(340px, calc(100vw - 66px)); }
+  .device-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .helper-note { display: none; }
+  .export-menu { left: 60px; bottom: 64px; width: min(250px, calc(100vw - 74px)); }
+  .custom-form { grid-template-columns: 1fr 1fr; }
+  .custom-form .full { grid-column: 1 / -1; }
+}
+</style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar glass">
+      <div class="brand">
+        <div class="brand-mark">RF</div>
+        <div class="brand-text">
+          <strong>Responsive Device Studio</strong>
+          <span>single html · remote frames · screenshot api</span>
+        </div>
+      </div>
+      <div class="urlbar">
+        <input id="urlInput" type="text" placeholder="https://example.com" />
+        <button id="goBtn" class="btn btn-primary">Load</button>
+      </div>
+      <div class="top-actions">
+        <a id="openBtn" class="btn" href="#" target="_blank" rel="noreferrer">Open tab</a>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="toolbar glass">
+        <button id="toolbarDrawer" class="tool-btn active" title="Devices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="16" rx="2"/><rect x="14" y="8" width="7" height="12" rx="2"/></svg></button>
+        <div class="tool-sep"></div>
+        <button id="toolbarFrame" class="tool-btn active" title="Frame on/off"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M10 5h4"/><path d="M11 18.2h2"/></svg></button>
+        <button id="toolbarRotate" class="tool-btn" title="Rotate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a7 7 0 0 1 12-4l2-2v6h-6l2-2a4 4 0 1 0 1.2 3"/><path d="M20 13a7 7 0 0 1-12 4l-2 2v-6h6l-2 2a4 4 0 0 0 6.8-2"/></svg></button>
+        <button id="toolbarReload" class="tool-btn" title="Reload screenshot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg></button>
+        <button id="toolbarBg" class="tool-btn" title="Background"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 12h18"/><path d="M12 3v18"/></svg></button>
+        <button id="toolbarZoomIn" class="tool-btn" title="Zoom in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6"/><path d="M21 21l-4.3-4.3"/><path d="M11 8v6"/><path d="M8 11h6"/></svg></button>
+        <button id="toolbarZoomOut" class="tool-btn" title="Zoom out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6"/><path d="M21 21l-4.3-4.3"/><path d="M8 11h6"/></svg></button>
+        <div class="tool-sep"></div>
+        <button id="toolbarShot" class="tool-btn" title="Screenshot API options"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h3l1.5-2h5L16 7h3a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+        <button id="toolbarRecord" class="tool-btn" title="Record stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3z"/></svg></button>
+      </aside>
+
+      <section id="stageCaptureTarget" class="stage glass">
+        <div class="stage-head">
+          <div class="stage-title">
+            <strong id="stageTitle">Loading...</strong>
+            <span id="stageMeta">Preparing preview</span>
+          </div>
+          <div class="stage-badges">
+            <div id="stageBadgeMode" class="pill">Frame on</div>
+            <div id="stageBadgeViewport" class="pill">0 × 0</div>
+          </div>
+        </div>
+        <div id="stageBody" class="stage-body">
+          <div id="centerWrap" class="center-wrap">
+            <div id="previewWrap" class="preview-wrap"></div>
+          </div>
+          <div id="loadingLayer" class="loading-layer hidden"><span>Refreshing screenshot…</span></div>
+          <div id="errorLayer" class="error-layer hidden"><span id="errorText"></span></div>
+          <div id="helperNote" class="helper-note">Left bar: devices, frame, rotate, reload, background, screenshot API, record.</div>
+        </div>
+      </section>
+
+      <div id="panelHost" class="panel-host">
+        <aside id="panel" class="panel glass">
+          <div class="panel-head">
+            <div>
+              <strong>Visible devices in the tab</strong>
+              <span id="deviceCount">0 devices</span>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <button id="addCustomBtn" class="btn btn-icon" title="Add custom device">+</button>
+              <button id="closePanel" class="btn btn-icon close-panel" title="Close panel">✕</button>
+            </div>
+          </div>
+          <div class="panel-search">
+            <div class="searchbox">
+              <span>⌕</span>
+              <input id="searchInput" type="text" placeholder="Search devices" />
+            </div>
+            <div id="customForm" class="custom-form hidden">
+              <input id="customName" class="full" type="text" placeholder="Custom device name" />
+              <input id="customWidth" type="number" min="100" placeholder="Width" />
+              <input id="customHeight" type="number" min="100" placeholder="Height" />
+              <select id="customKind" class="full">
+                <option value="phone">Phone</option>
+                <option value="tablet">Tablet</option>
+                <option value="desktop">Desktop</option>
+                <option value="watch">Watch</option>
+              </select>
+              <div class="custom-actions">
+                <button id="customAdd" class="btn btn-primary" type="button">Add device</button>
+                <button id="customCancel" class="btn" type="button">Cancel</button>
+              </div>
+            </div>
+          </div>
+          <div id="deviceGroups" class="device-scroll"></div>
+        </aside>
+      </div>
+    </main>
+
+    <div id="exportMenu" class="export-menu glass hidden">
+      <strong>Screenshot API</strong>
+      <div class="row">
+        <label for="exportFull">Capture size</label>
+        <select id="exportFull">
+          <option value="false">Current height</option>
+          <option value="true">Full page</option>
+        </select>
+      </div>
+      <div class="row">
+        <label for="exportFormat">Format</label>
+        <select id="exportFormat">
+          <option value="JPEG">JPG</option>
+          <option value="PNG">PNG</option>
+        </select>
+      </div>
+      <div class="actions">
+        <button id="exportOpen" class="btn btn-primary" type="button">Open API URL</button>
+        <button id="exportClose" class="btn" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <video id="captureVideo" playsinline muted hidden></video>
+  <canvas id="recordCanvas" hidden></canvas>
+
+  <script>
+const DEVICES = [{"id":"apple-iphone-18-pro-2026","name":"Apple iPhone 18 PRO","brand":"Apple","kind":"phone","group":"apple","year":2026,"viewport":{"width":402,"height":873},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-18-pro-2026-transparent.png","frameWidth":389,"frameHeight":800,"screen":{"x":18,"y":14,"width":353,"height":772,"radii":{"tl":53,"tr":52,"br":721,"bl":53}},"landscapeScreen":{"x":14,"y":18,"width":772,"height":353}}},{"id":"apple-iphone-18-pro-max-2026","name":"Apple iPhone 18 PRO MAX","brand":"Apple","kind":"phone","group":"apple","year":2026,"viewport":{"width":440,"height":956},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-18-pro-max-2026-transparent.png","frameWidth":389,"frameHeight":800,"screen":{"x":18,"y":14,"width":354,"height":772,"radii":{"tl":60,"tr":60,"br":53,"bl":53}},"landscapeScreen":{"x":14,"y":18,"width":772,"height":354}}},{"id":"apple-iphone-duo-folded-2026","name":"Apple iPhone Duo folded","brand":"Apple","kind":"phone","group":"apple","year":2026,"viewport":{"width":466,"height":678},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-duo-folded-2026-transparent.png","frameWidth":573,"frameHeight":800,"screen":{"x":31,"y":25,"width":520,"height":755,"radii":{"tl":8,"tr":693,"br":62,"bl":5}},"landscapeScreen":{"x":20,"y":31,"width":755,"height":520}}},{"id":"apple-iphone-duo-unfolded-2026","name":"Apple iPhone Duo unfolded","brand":"Apple","kind":"phone","group":"apple","year":2026,"viewport":{"width":890,"height":626},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-duo-unfolded-2026-transparent.png","frameWidth":800,"frameHeight":575,"screen":{"x":19,"y":20,"width":759,"height":535,"radii":{"tl":40,"tr":40,"br":33,"bl":34}},"landscapeScreen":{"x":20,"y":19,"width":535,"height":759}}},{"id":"apple-macbook-neo-2026","name":"Macbook Neo 2026","brand":"Apple","kind":"desktop","group":"special","year":2026,"viewport":{"width":1204,"height":753},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-macbook-neo-2026-transparent.png","frameWidth":800,"frameHeight":488,"screen":{"x":81,"y":22,"width":638,"height":400,"radii":{"tl":6,"tr":6,"br":0,"bl":0}},"landscapeScreen":{"x":66,"y":81,"width":400,"height":638}}},{"id":"apple-iphone-17-2025","name":"Apple iPhone 17","brand":"Apple","kind":"phone","group":"apple","year":2025,"viewport":{"width":402,"height":874},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-17-2025-transparent.png","frameWidth":388,"frameHeight":800,"screen":{"x":18,"y":16,"width":352,"height":768,"radii":{"tl":51,"tr":51,"br":51,"bl":51}},"landscapeScreen":{"x":16,"y":18,"width":768,"height":352}}},{"id":"apple-iphone-17-pro-2025","name":"Apple iPhone 17 PRO","brand":"Apple","kind":"phone","group":"apple","year":2025,"viewport":{"width":402,"height":873},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-17-pro-2025-transparent.png","frameWidth":389,"frameHeight":800,"screen":{"x":18,"y":14,"width":353,"height":772,"radii":{"tl":53,"tr":52,"br":721,"bl":53}},"landscapeScreen":{"x":14,"y":18,"width":772,"height":353}}},{"id":"apple-iphone-17-pro-max-2025","name":"Apple iPhone 17 PRO MAX","brand":"Apple","kind":"phone","group":"apple","year":2025,"viewport":{"width":440,"height":956},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-17-pro-max-2025-transparent.png","frameWidth":389,"frameHeight":800,"screen":{"x":18,"y":14,"width":354,"height":772,"radii":{"tl":60,"tr":60,"br":53,"bl":53}},"landscapeScreen":{"x":14,"y":18,"width":772,"height":354}}},{"id":"apple-iphone-air-2025","name":"Apple iPhone Air","brand":"Apple","kind":"phone","group":"apple","year":2025,"viewport":{"width":420,"height":912},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-air-2025-transparent.png","frameWidth":388,"frameHeight":800,"screen":{"x":16,"y":13,"width":356,"height":773,"radii":{"tl":59,"tr":59,"br":51,"bl":51}},"landscapeScreen":{"x":14,"y":16,"width":773,"height":356}}},{"id":"apple-iphone-16-2024","name":"Apple iPhone 16","brand":"Apple","kind":"phone","group":"apple","year":2024,"viewport":{"width":393,"height":852},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-16-2024-transparent.png","frameWidth":393,"frameHeight":800,"screen":{"x":23,"y":19,"width":348,"height":759,"radii":{"tl":717,"tr":49,"br":46,"bl":45}},"landscapeScreen":{"x":22,"y":23,"width":759,"height":348}}},{"id":"apple-iphone-16-plus-2024","name":"Apple iPhone 16 Plus","brand":"Apple","kind":"phone","group":"apple","year":2024,"viewport":{"width":430,"height":932},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-16-plus-2024-transparent.png","frameWidth":394,"frameHeight":800,"screen":{"x":24,"y":21,"width":348,"height":759,"radii":{"tl":45,"tr":60,"br":62,"bl":45}},"landscapeScreen":{"x":20,"y":24,"width":759,"height":348}}},{"id":"apple-iphone-16-pro-max-2024","name":"Apple iPhone 16 PRO MAX","brand":"Apple","kind":"phone","group":"apple","year":2024,"viewport":{"width":440,"height":956},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-16-pro-max-2024-transparent.png","frameWidth":388,"frameHeight":800,"screen":{"x":20,"y":17,"width":351,"height":769,"radii":{"tl":57,"tr":59,"br":64,"bl":61}},"landscapeScreen":{"x":14,"y":20,"width":769,"height":351}}},{"id":"apple-iphone-15-2023","name":"Apple iPhone 15","brand":"Apple","kind":"phone","group":"apple","year":2023,"viewport":{"width":393,"height":852},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-15-2023-transparent.png","frameWidth":392,"frameHeight":800,"screen":{"x":20,"y":16,"width":352,"height":767,"radii":{"tl":41,"tr":41,"br":34,"bl":37}},"landscapeScreen":{"x":17,"y":20,"width":767,"height":352}}},{"id":"apple-iphone-15-plus-2023","name":"Apple iPhone 15 Plus","brand":"Apple","kind":"phone","group":"apple","year":2023,"viewport":{"width":430,"height":932},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-15-plus-2023-transparent.png","frameWidth":392,"frameHeight":800,"screen":{"x":19,"y":17,"width":354,"height":766,"radii":{"tl":311,"tr":37,"br":37,"bl":50}},"landscapeScreen":{"x":17,"y":19,"width":766,"height":354}}},{"id":"apple-iphone-15-pro-2023","name":"Apple iPhone 15 PRO","brand":"Apple","kind":"phone","group":"apple","year":2023,"viewport":{"width":393,"height":852},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-15-pro-2023-transparent.png","frameWidth":391,"frameHeight":800,"screen":{"x":21,"y":17,"width":350,"height":766,"radii":{"tl":46,"tr":47,"br":47,"bl":46}},"landscapeScreen":{"x":17,"y":21,"width":766,"height":350}}},{"id":"apple-iphone-15-pro-max-2023","name":"Apple iPhone 15 PRO MAX","brand":"Apple","kind":"phone","group":"apple","year":2023,"viewport":{"width":430,"height":932},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-15-pro-max-2023-transparent.png","frameWidth":390,"frameHeight":800,"screen":{"x":17,"y":15,"width":356,"height":771,"radii":{"tl":309,"tr":50,"br":50,"bl":40}},"landscapeScreen":{"x":14,"y":17,"width":771,"height":356}}},{"id":"apple-iphone-14-2022","name":"Apple iPhone 14","brand":"Apple","kind":"phone","group":"apple","year":2022,"viewport":{"width":390,"height":844},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-14-2022-transparent.png","frameWidth":393,"frameHeight":800,"screen":{"x":23,"y":20,"width":347,"height":758,"radii":{"tl":722,"tr":104,"br":37,"bl":31}},"landscapeScreen":{"x":22,"y":23,"width":758,"height":347}}},{"id":"apple-iphone-14-max-2022","name":"Apple iPhone 14 Plus","brand":"Apple","kind":"phone","group":"apple","year":2022,"viewport":{"width":428,"height":926},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-14-max-2022-transparent.png","frameWidth":395,"frameHeight":800,"screen":{"x":22,"y":20,"width":352,"height":762,"radii":{"tl":42,"tr":244,"br":46,"bl":47}},"landscapeScreen":{"x":18,"y":22,"width":762,"height":352}}},{"id":"apple-iphone-14-pro-2022","name":"Apple iPhone 14 PRO","brand":"Apple","kind":"phone","group":"apple","year":2022,"viewport":{"width":390,"height":844},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-14-pro-2022-transparent.png","frameWidth":393,"frameHeight":800,"screen":{"x":24,"y":20,"width":348,"height":760,"radii":{"tl":49,"tr":53,"br":53,"bl":48}},"landscapeScreen":{"x":20,"y":24,"width":760,"height":348}}},{"id":"apple-iphone-14-pro-max-2022","name":"Apple iPhone 14 PRO MAX","brand":"Apple","kind":"phone","group":"apple","year":2022,"viewport":{"width":428,"height":928},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-14-pro-max-2022-transparent.png","frameWidth":393,"frameHeight":800,"screen":{"x":22,"y":22,"width":350,"height":759,"radii":{"tl":54,"tr":48,"br":52,"bl":57}},"landscapeScreen":{"x":19,"y":22,"width":759,"height":350}}},{"id":"apple-iphone-13-2021","name":"Apple iPhone 13","brand":"Apple","kind":"phone","group":"apple","year":2021,"viewport":{"width":390,"height":844},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-13-2021-transparent.png","frameWidth":397,"frameHeight":800,"screen":{"x":24,"y":23,"width":350,"height":754,"radii":{"tl":42,"tr":45,"br":45,"bl":42}},"landscapeScreen":{"x":23,"y":24,"width":754,"height":350}}},{"id":"apple-iphone-13-mini-2021","name":"Apple iPhone 13 Mini","brand":"Apple","kind":"phone","group":"apple","year":2021,"viewport":{"width":375,"height":812},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-13-mini-2021-transparent.png","frameWidth":397,"frameHeight":800,"screen":{"x":23,"y":19,"width":352,"height":761,"radii":{"tl":253,"tr":50,"br":49,"bl":48}},"landscapeScreen":{"x":20,"y":23,"width":761,"height":352}}},{"id":"apple-iphone-13-pro-2021","name":"Apple iPhone 13 PRO","brand":"Apple","kind":"phone","group":"apple","year":2021,"viewport":{"width":390,"height":844},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-13-pro-2021-transparent.png","frameWidth":394,"frameHeight":800,"screen":{"x":24,"y":17,"width":351,"height":763,"radii":{"tl":44,"tr":47,"br":42,"bl":40}},"landscapeScreen":{"x":20,"y":24,"width":763,"height":351}}},{"id":"apple-iphone-13-pro-max-2021","name":"Apple iPhone 13 PRO MAX","brand":"Apple","kind":"phone","group":"apple","year":2021,"viewport":{"width":428,"height":926},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-13-pro-max-2021-transparent.png","frameWidth":397,"frameHeight":800,"screen":{"x":24,"y":21,"width":350,"height":758,"radii":{"tl":39,"tr":253,"br":45,"bl":39}},"landscapeScreen":{"x":21,"y":24,"width":758,"height":350}}},{"id":"apple-macbook-pro-16-2021","name":"Apple Macbook PRO 16\"","brand":"Apple","kind":"desktop","group":"special","year":2021,"viewport":{"width":1728,"height":1117},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-macbook-pro-16-2021-transparent.png","frameWidth":800,"frameHeight":489,"screen":{"x":77,"y":21,"width":646,"height":416,"radii":{"tl":0,"tr":0,"br":0,"bl":0}},"landscapeScreen":{"x":52,"y":77,"width":416,"height":646}}},{"id":"apple-imac-24-inch-2021","name":"iMac 24\"","brand":"Apple","kind":"desktop","group":"special","year":2021,"viewport":{"width":2048,"height":1152},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-imac-24-inch-2021-transparent.png","frameWidth":800,"frameHeight":721,"screen":{"x":23,"y":23,"width":754,"height":422,"radii":{"tl":0,"tr":0,"br":0,"bl":0}},"landscapeScreen":{"x":276,"y":23,"width":422,"height":754}}},{"id":"apple-ipad-pro-11-2018","name":"Apple iPad PRO 11\" (3rd Gen)","brand":"Apple","kind":"tablet","group":"tablet","year":2018,"viewport":{"width":834,"height":1194},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-ipad-pro-11-2018-transparent.png","frameWidth":578,"frameHeight":800,"screen":{"x":33,"y":34,"width":511,"height":734,"radii":{"tl":3,"tr":4,"br":4,"bl":4}},"landscapeScreen":{"x":32,"y":33,"width":734,"height":511}}},{"id":"apple-ipad-air-4","name":"Apple iPad Air 4","brand":"Apple","kind":"tablet","group":"tablet","year":null,"viewport":{"width":820,"height":1180},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-ipad-air-4-transparent.png","frameWidth":577,"frameHeight":800,"screen":{"x":36,"y":38,"width":503,"height":725,"radii":{"tl":721,"tr":4,"br":4,"bl":5}},"landscapeScreen":{"x":37,"y":36,"width":725,"height":503}}},{"id":"apple-ipad-mini","name":"Apple iPad Mini (6th Gen)","brand":"Apple","kind":"tablet","group":"tablet","year":null,"viewport":{"width":768,"height":1024},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-ipad-mini-transparent.png","frameWidth":530,"frameHeight":800,"screen":{"x":32,"y":89,"width":466,"height":622,"radii":{"tl":0,"tr":0,"br":0,"bl":0}},"landscapeScreen":{"x":89,"y":32,"width":622,"height":466}}},{"id":"apple-iphone-11","name":"Apple iPhone 11","brand":"Apple","kind":"phone","group":"apple","year":null,"viewport":{"width":414,"height":896},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-11-transparent.png","frameWidth":405,"frameHeight":800,"screen":{"x":33,"y":30,"width":339,"height":740,"radii":{"tl":30,"tr":31,"br":31,"bl":30}},"landscapeScreen":{"x":30,"y":33,"width":740,"height":339}}},{"id":"apple-iphone-11-pro","name":"Apple iPhone 11 Pro","brand":"Apple","kind":"phone","group":"apple","year":null,"viewport":{"width":375,"height":812},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-11-pro-transparent.png","frameWidth":396,"frameHeight":800,"screen":{"x":29,"y":26,"width":338,"height":739,"radii":{"tl":28,"tr":28,"br":31,"bl":31}},"landscapeScreen":{"x":35,"y":29,"width":739,"height":338}}},{"id":"apple-iphone-11-pro-max","name":"Apple iPhone 11 Pro Max","brand":"Apple","kind":"phone","group":"apple","year":null,"viewport":{"width":414,"height":896},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-11-pro-max-transparent.png","frameWidth":397,"frameHeight":800,"screen":{"x":27,"y":24,"width":346,"height":752,"radii":{"tl":25,"tr":323,"br":323,"bl":25}},"landscapeScreen":{"x":24,"y":27,"width":752,"height":346}}},{"id":"apple-iphone-12","name":"Apple iPhone 12","brand":"Apple","kind":"phone","group":"apple","year":null,"viewport":{"width":390,"height":844},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-12-transparent.png","frameWidth":396,"frameHeight":800,"screen":{"x":25,"y":22,"width":346,"height":756,"radii":{"tl":31,"tr":31,"br":31,"bl":31}},"landscapeScreen":{"x":22,"y":25,"width":756,"height":346}}},{"id":"apple-iphone-12-mini","name":"Apple iPhone 12 Mini","brand":"Apple","kind":"phone","group":"apple","year":null,"viewport":{"width":360,"height":780},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-12-mini-transparent.png","frameWidth":397,"frameHeight":800,"screen":{"x":25,"y":22,"width":346,"height":756,"radii":{"tl":37,"tr":37,"br":37,"bl":37}},"landscapeScreen":{"x":22,"y":25,"width":756,"height":346}}},{"id":"apple-iphone-12-pro","name":"Apple iPhone 12 Pro","brand":"Apple","kind":"phone","group":"apple","year":null,"viewport":{"width":390,"height":844},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-12-pro-transparent.png","frameWidth":396,"frameHeight":800,"screen":{"x":25,"y":21,"width":346,"height":758,"radii":{"tl":32,"tr":32,"br":32,"bl":315}},"landscapeScreen":{"x":21,"y":25,"width":758,"height":346}}},{"id":"apple-iphone-12-pro-max","name":"Apple iPhone 12 Pro Max","brand":"Apple","kind":"phone","group":"apple","year":null,"viewport":{"width":428,"height":926},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-12-pro-max-transparent.png","frameWidth":395,"frameHeight":800,"screen":{"x":23,"y":20,"width":349,"height":760,"radii":{"tl":35,"tr":35,"br":35,"bl":35}},"landscapeScreen":{"x":20,"y":23,"width":760,"height":349}}},{"id":"apple-iphone-5","name":"Apple iPhone 5","brand":"Apple","kind":"phone","group":"apple","year":null,"viewport":{"width":320,"height":568},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-5-transparent.png","frameWidth":378,"frameHeight":800,"screen":{"x":35,"y":119,"width":314,"height":563,"radii":{"tl":0,"tr":0,"br":0,"bl":0}},"landscapeScreen":{"x":118,"y":35,"width":563,"height":314}}},{"id":"apple-iphone-se","name":"Apple iPhone SE","brand":"Apple","kind":"phone","group":"apple","year":null,"viewport":{"width":320,"height":568},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-se-transparent.png","frameWidth":394,"frameHeight":800,"screen":{"x":30,"y":101,"width":334,"height":596,"radii":{"tl":0,"tr":0,"br":0,"bl":0}},"landscapeScreen":{"x":103,"y":30,"width":596,"height":334}}},{"id":"apple-iphone-x","name":"Apple iPhone X","brand":"Apple","kind":"phone","group":"apple","year":null,"viewport":{"width":375,"height":812},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-x-transparent.png","frameWidth":399,"frameHeight":800,"screen":{"x":28,"y":24,"width":343,"height":752,"radii":{"tl":28,"tr":28,"br":28,"bl":28}},"landscapeScreen":{"x":24,"y":28,"width":752,"height":343}}},{"id":"apple-iphone-xr","name":"Apple iPhone XR","brand":"Apple","kind":"phone","group":"apple","year":null,"viewport":{"width":414,"height":896},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-iphone-xr-transparent.png","frameWidth":405,"frameHeight":800,"screen":{"x":32,"y":31,"width":341,"height":739,"radii":{"tl":27,"tr":27,"br":32,"bl":32}},"landscapeScreen":{"x":30,"y":32,"width":739,"height":341}}},{"id":"macbook-air","name":"Apple MacBook Air 2020 13\"","brand":"Apple","kind":"desktop","group":"special","year":null,"viewport":{"width":1280,"height":800},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-macbook-air-transparent.png","frameWidth":800,"frameHeight":460,"screen":{"x":91,"y":29,"width":617,"height":383,"radii":{"tl":0,"tr":0,"br":0,"bl":0}},"landscapeScreen":{"x":48,"y":91,"width":383,"height":617}}},{"id":"apple-watch-serie-6","name":"Apple Watch Series 6 (40mm)","brand":"Apple","kind":"watch","group":"special","year":null,"viewport":{"width":162,"height":197},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-apple-watch-serie-6-transparent.png","frameWidth":464,"frameHeight":800,"screen":{"x":58,"y":200,"width":331,"height":404,"radii":{"tl":280,"tr":53,"br":61,"bl":59}},"landscapeScreen":{"x":196,"y":58,"width":404,"height":331}}},{"id":"dell-latitude-14-3420","name":"Dell Latitude 3420 14\"","brand":"Dell","kind":"desktop","group":"special","year":null,"viewport":{"width":1440,"height":809},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-dell-latitude-14-3420-transparent.png","frameWidth":800,"frameHeight":548,"screen":{"x":81,"y":39,"width":639,"height":357,"radii":{"tl":0,"tr":0,"br":0,"bl":0}},"landscapeScreen":{"x":152,"y":81,"width":357,"height":639}}},{"id":"non-branded-android-smartphone","name":"Generic device on Android","brand":"Generic","kind":"phone","group":"android","year":null,"viewport":{"width":360,"height":800},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-non-branded-android-smartphone-transparent.png","frameWidth":380,"frameHeight":800,"screen":{"x":17,"y":19,"width":341,"height":762,"radii":{"tl":24,"tr":318,"br":318,"bl":24}},"landscapeScreen":{"x":19,"y":17,"width":762,"height":341}}},{"id":"google-pixel-10-2026","name":"Google Pixel 10","brand":"Google","kind":"phone","group":"android","year":2026,"viewport":{"width":412,"height":924},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-google-pixel-10-2026-transparent.png","frameWidth":379,"frameHeight":800,"screen":{"x":20,"y":21,"width":337,"height":758,"radii":{"tl":720,"tr":716,"br":40,"bl":39}},"landscapeScreen":{"x":21,"y":20,"width":758,"height":337}}},{"id":"google-pixel-10-pro-2026","name":"Google Pixel 10 PRO","brand":"Google","kind":"phone","group":"android","year":2026,"viewport":{"width":410,"height":912},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-google-pixel-10-pro-2026-transparent.png","frameWidth":380,"frameHeight":800,"screen":{"x":18,"y":16,"width":342,"height":767,"radii":{"tl":36,"tr":728,"br":306,"bl":31}},"landscapeScreen":{"x":17,"y":18,"width":767,"height":342}}},{"id":"google-pixel-10-pro-fold-2026","name":"Pixel 10 Fold folded","brand":"Google","kind":"phone","group":"android","year":2026,"viewport":{"width":412,"height":901},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-google-pixel-10-pro-fold-2026-transparent.png","frameWidth":395,"frameHeight":800,"screen":{"x":27,"y":23,"width":345,"height":754,"radii":{"tl":306,"tr":40,"br":40,"bl":306}},"landscapeScreen":{"x":23,"y":27,"width":754,"height":345}}},{"id":"google-pixel-8-2024","name":"Google Pixel 8","brand":"Google","kind":"phone","group":"android","year":2024,"viewport":{"width":412,"height":915},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-google-pixel-8-2024-transparent.png","frameWidth":380,"frameHeight":800,"screen":{"x":17,"y":18,"width":340,"height":759,"radii":{"tl":313,"tr":23,"br":23,"bl":26}},"landscapeScreen":{"x":23,"y":17,"width":759,"height":340}}},{"id":"google-pixel-5","name":"Google Pixel 5","brand":"Google","kind":"phone","group":"android","year":null,"viewport":{"width":393,"height":851},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-google-pixel-5-transparent.png","frameWidth":392,"frameHeight":800,"screen":{"x":21,"y":19,"width":347,"height":762,"radii":{"tl":29,"tr":28,"br":28,"bl":29}},"landscapeScreen":{"x":19,"y":21,"width":762,"height":347}}},{"id":"google-pixel-6-pro","name":"Google Pixel 6 PRO","brand":"Google","kind":"phone","group":"android","year":null,"viewport":{"width":360,"height":780},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-google-pixel-6-pro-transparent.png","frameWidth":368,"frameHeight":800,"screen":{"x":10,"y":20,"width":347,"height":748,"radii":{"tl":11,"tr":11,"br":10,"bl":10}},"landscapeScreen":{"x":32,"y":10,"width":748,"height":347}}},{"id":"huawei-p30-pro","name":"Huawei P30 PRO","brand":"Huawei","kind":"phone","group":"android","year":null,"viewport":{"width":360,"height":780},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-huawei-p30-pro-transparent.png","frameWidth":371,"frameHeight":800,"screen":{"x":10,"y":15,"width":350,"height":760,"radii":{"tl":152,"tr":22,"br":22,"bl":23}},"landscapeScreen":{"x":25,"y":10,"width":760,"height":350}}},{"id":"infinix-hot-70-2026","name":"Infinix Hot 70","brand":"Infinix","kind":"phone","group":"android","year":2026,"viewport":{"width":360,"height":788},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-infinix-hot-70-2026-transparent.png","frameWidth":379,"frameHeight":800,"screen":{"x":20,"y":24,"width":337,"height":746,"radii":{"tl":29,"tr":28,"br":30,"bl":305}},"landscapeScreen":{"x":30,"y":20,"width":746,"height":337}}},{"id":"microsoft-surface-duo","name":"Microsoft Surface Duo","brand":"Microsoft","kind":"tablet","group":"tablet","year":null,"viewport":{"width":1114,"height":705},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-microsoft-surface-duo-transparent.png","frameWidth":800,"frameHeight":633,"screen":{"x":20,"y":65,"width":366,"height":479,"radii":{"tl":0,"tr":0,"br":0,"bl":0}},"landscapeScreen":{"x":89,"y":20,"width":479,"height":366}}},{"id":"motorola-razr-70-ultra-2026","name":"Motorola Razr 70 Ultra","brand":"Motorola","kind":"phone","group":"android","year":2026,"viewport":{"width":412,"height":1008},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-motorola-razr-70-ultra-2026-transparent.png","frameWidth":352,"frameHeight":800,"screen":{"x":24,"y":24,"width":304,"height":754,"radii":{"tl":18,"tr":18,"br":23,"bl":23}},"landscapeScreen":{"x":22,"y":24,"width":754,"height":304}}},{"id":"oneplus-nord-2","name":"OnePlus Nord 2","brand":"OnePlus","kind":"phone","group":"android","year":null,"viewport":{"width":412,"height":915},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-oneplus-nord-2-transparent.png","frameWidth":369,"frameHeight":800,"screen":{"x":19,"y":20,"width":336,"height":750,"radii":{"tl":25,"tr":29,"br":31,"bl":28}},"landscapeScreen":{"x":30,"y":19,"width":750,"height":336}}},{"id":"oppo-find-x3-pro","name":"OPPO Find X3 PRO","brand":"OPPO","kind":"phone","group":"android","year":null,"viewport":{"width":360,"height":804},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-oppo-find-x3-pro-transparent.png","frameWidth":360,"frameHeight":800,"screen":{"x":10,"y":22,"width":340,"height":755,"radii":{"tl":26,"tr":27,"br":26,"bl":25}},"landscapeScreen":{"x":23,"y":10,"width":755,"height":340}}},{"id":"samsung-galaxy-s26-ultra-2026","name":"Galaxy S26 ULTRA","brand":"Samsung","kind":"phone","group":"android","year":2026,"viewport":{"width":412,"height":891},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-samsung-galaxy-s26-ultra-2026-transparent.png","frameWidth":385,"frameHeight":800,"screen":{"x":14,"y":13,"width":354,"height":775,"radii":{"tl":19,"tr":19,"br":19,"bl":20}},"landscapeScreen":{"x":12,"y":14,"width":775,"height":354}}},{"id":"samsung-galaxy-a17-2025","name":"Samsung Galaxy A17","brand":"Samsung","kind":"phone","group":"android","year":2025,"viewport":{"width":412,"height":892},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-samsung-galaxy-a17-2025-transparent.png","frameWidth":384,"frameHeight":800,"screen":{"x":18,"y":21,"width":344,"height":741,"radii":{"tl":29,"tr":29,"br":29,"bl":27}},"landscapeScreen":{"x":38,"y":18,"width":741,"height":344}}},{"id":"samsung-galaxy-s24-2024","name":"Samsung Galaxy S24","brand":"Samsung","kind":"phone","group":"android","year":2024,"viewport":{"width":360,"height":780},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-samsung-galaxy-s24-2024-transparent.png","frameWidth":386,"frameHeight":800,"screen":{"x":16,"y":17,"width":354,"height":769,"radii":{"tl":30,"tr":29,"br":31,"bl":32}},"landscapeScreen":{"x":14,"y":16,"width":769,"height":354}}},{"id":"samsung-galaxy-s24-ultra-2024","name":"Samsung Galaxy S24 Ultra","brand":"Samsung","kind":"phone","group":"android","year":2024,"viewport":{"width":384,"height":832},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-samsung-galaxy-s24-ultra-2024-transparent.png","frameWidth":391,"frameHeight":800,"screen":{"x":20,"y":17,"width":350,"height":764,"radii":{"tl":0,"tr":0,"br":0,"bl":0}},"landscapeScreen":{"x":19,"y":20,"width":764,"height":350}}},{"id":"samsung-galaxy-s22-2022","name":"Samsung Galaxy S22","brand":"Samsung","kind":"phone","group":"android","year":2022,"viewport":{"width":360,"height":780},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-samsung-galaxy-s22-2022-transparent.png","frameWidth":388,"frameHeight":800,"screen":{"x":18,"y":15,"width":349,"height":769,"radii":{"tl":32,"tr":33,"br":34,"bl":34}},"landscapeScreen":{"x":16,"y":18,"width":769,"height":349}}},{"id":"samsung-galaxy-s22-ultra-2022","name":"Samsung Galaxy S22 ULTRA","brand":"Samsung","kind":"phone","group":"android","year":2022,"viewport":{"width":360,"height":772},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-samsung-galaxy-s22-ultra-2022-transparent.png","frameWidth":379,"frameHeight":800,"screen":{"x":7,"y":8,"width":362,"height":782,"radii":{"tl":2,"tr":2,"br":2,"bl":2}},"landscapeScreen":{"x":10,"y":7,"width":782,"height":362}}},{"id":"samsung-galaxy-s22-plus-2022","name":"Samsung Galaxy S22+","brand":"Samsung","kind":"phone","group":"android","year":2022,"viewport":{"width":360,"height":780},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-samsung-galaxy-s22-plus-2022-transparent.png","frameWidth":388,"frameHeight":800,"screen":{"x":18,"y":15,"width":349,"height":769,"radii":{"tl":32,"tr":33,"br":34,"bl":34}},"landscapeScreen":{"x":16,"y":18,"width":769,"height":349}}},{"id":"samsung-galaxy-a12-2021","name":"Samsung Galaxy A12","brand":"Samsung","kind":"phone","group":"android","year":2021,"viewport":{"width":360,"height":800},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-samsung-galaxy-a12-2021-transparent.png","frameWidth":370,"frameHeight":800,"screen":{"x":17,"y":20,"width":334,"height":743,"radii":{"tl":197,"tr":28,"br":29,"bl":26}},"landscapeScreen":{"x":37,"y":17,"width":743,"height":334}}},{"id":"samsung-galaxy-z-flip3-2021","name":"Samsung Galaxy Z Flip3","brand":"Samsung","kind":"phone","group":"android","year":2021,"viewport":{"width":360,"height":880},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-samsung-galaxy-z-flip3-2021-transparent.png","frameWidth":356,"frameHeight":800,"screen":{"x":22,"y":22,"width":309,"height":755,"radii":{"tl":16,"tr":290,"br":291,"bl":15}},"landscapeScreen":{"x":23,"y":22,"width":755,"height":309}}},{"id":"samsung-galaxy-fold","name":"Samsung Galaxy Fold","brand":"Samsung","kind":"phone","group":"android","year":null,"viewport":{"width":768,"height":1076},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-samsung-galaxy-fold-transparent.png","frameWidth":645,"frameHeight":800,"screen":{"x":12,"y":17,"width":616,"height":768,"radii":{"tl":14,"tr":10,"br":12,"bl":15}},"landscapeScreen":{"x":15,"y":12,"width":768,"height":616}}},{"id":"samsung-galaxy-note20-ultra","name":"Samsung Galaxy Note20 Ultra","brand":"Samsung","kind":"phone","group":"android","year":null,"viewport":{"width":412,"height":883},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-samsung-galaxy-note20-ultra-transparent.png","frameWidth":371,"frameHeight":800,"screen":{"x":6,"y":12,"width":356,"height":770,"radii":{"tl":7,"tr":7,"br":7,"bl":349}},"landscapeScreen":{"x":18,"y":6,"width":770,"height":356}}},{"id":"samsung-galaxy-s20","name":"Samsung Galaxy S20","brand":"Samsung","kind":"phone","group":"android","year":null,"viewport":{"width":360,"height":800},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-samsung-galaxy-s20-transparent.png","frameWidth":368,"frameHeight":800,"screen":{"x":22,"y":15,"width":322,"height":766,"radii":{"tl":28,"tr":35,"br":26,"bl":26}},"landscapeScreen":{"x":19,"y":22,"width":766,"height":322}}},{"id":"samsung-galaxy-s21-ultra","name":"Samsung Galaxy S21 Ultra","brand":"Samsung","kind":"phone","group":"android","year":null,"viewport":{"width":360,"height":800},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-samsung-galaxy-s21-ultra-transparent.png","frameWidth":369,"frameHeight":800,"screen":{"x":13,"y":13,"width":344,"height":769,"radii":{"tl":20,"tr":26,"br":322,"bl":20}},"landscapeScreen":{"x":18,"y":13,"width":769,"height":344}}},{"id":"samsung-galaxy-tab-s7","name":"Samsung Galaxy Tab S7","brand":"Samsung","kind":"tablet","group":"tablet","year":null,"viewport":{"width":800,"height":1280},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-samsung-galaxy-tab-s7-transparent.png","frameWidth":522,"frameHeight":800,"screen":{"x":30,"y":27,"width":463,"height":743,"radii":{"tl":4,"tr":6,"br":3,"bl":1}},"landscapeScreen":{"x":30,"y":30,"width":743,"height":463}}},{"id":"samsung-galaxy-fold2","name":"Samsung Galaxy Z Fold 2 unfolded","brand":"Samsung","kind":"phone","group":"android","year":null,"viewport":{"width":884,"height":1104},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-samsung-galaxy-fold2-transparent.png","frameWidth":645,"frameHeight":800,"screen":{"x":12,"y":17,"width":616,"height":768,"radii":{"tl":14,"tr":10,"br":12,"bl":15}},"landscapeScreen":{"x":15,"y":12,"width":768,"height":616}}},{"id":"samsung-smart-tv","name":"Samsung Smart TV","brand":"Samsung","kind":"desktop","group":"special","year":null,"viewport":{"width":1920,"height":1080},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-samsung-smart-tv-transparent.png","frameWidth":800,"frameHeight":498,"screen":{"x":5,"y":5,"width":788,"height":444,"radii":{"tl":693,"tr":234,"br":787,"bl":0}},"landscapeScreen":{"x":49,"y":5,"width":444,"height":788}}},{"id":"samsung-smart-tv-neo-qled-4k-55","name":"Samsung Smart TV NEO QLED 4K 55\"","brand":"Samsung","kind":"desktop","group":"special","year":null,"viewport":{"width":1920,"height":1080},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-samsung-smart-tv-neo-qled-4k-55-transparent.png","frameWidth":800,"frameHeight":498,"screen":{"x":5,"y":5,"width":788,"height":444,"radii":{"tl":693,"tr":234,"br":787,"bl":0}},"landscapeScreen":{"x":49,"y":5,"width":444,"height":788}}},{"id":"self-service-kiosk","name":"Self service kiosk","brand":"Self","kind":"desktop","group":"special","year":null,"viewport":{"width":1080,"height":1920},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-self-service-kiosk-transparent.png","frameWidth":365,"frameHeight":800,"screen":{"x":39,"y":40,"width":285,"height":508,"radii":{"tl":0,"tr":0,"br":284,"bl":0}},"landscapeScreen":{"x":252,"y":39,"width":508,"height":285}}},{"id":"sonoff-nspanel-pro","name":"Sonoff NSPanel Pro","brand":"Sonoff","kind":"desktop","group":"special","year":null,"viewport":{"width":480,"height":480},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-sonoff-nspanel-pro-transparent.png","frameWidth":797,"frameHeight":800,"screen":{"x":62,"y":66,"width":671,"height":670,"radii":{"tl":0,"tr":0,"br":0,"bl":0}},"landscapeScreen":{"x":64,"y":62,"width":670,"height":671}}},{"id":"xiaomi-12-2022","name":"Xiaomi 12 2022","brand":"Xiaomi","kind":"phone","group":"android","year":2022,"viewport":{"width":360,"height":800},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-xiaomi-12-2022-transparent.png","frameWidth":369,"frameHeight":800,"screen":{"x":11,"y":15,"width":344,"height":763,"radii":{"tl":35,"tr":33,"br":32,"bl":32}},"landscapeScreen":{"x":22,"y":11,"width":763,"height":344}}},{"id":"xiaomi-mi-11i","name":"Xiaomi Mi 11i","brand":"Xiaomi","kind":"phone","group":"android","year":null,"viewport":{"width":360,"height":800},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-xiaomi-mi-11i-transparent.png","frameWidth":376,"frameHeight":800,"screen":{"x":18,"y":19,"width":336,"height":757,"radii":{"tl":25,"tr":24,"br":29,"bl":29}},"landscapeScreen":{"x":24,"y":18,"width":757,"height":336}}},{"id":"zebra-tc78","name":"Zebra TC78","brand":"Zebra","kind":"desktop","group":"special","year":null,"viewport":{"width":412,"height":818},"frame":{"image":"https://www.webmobilefirst.com/img/mockups/mockup-zebra-tc78-transparent.png","frameWidth":386,"frameHeight":800,"screen":{"x":40,"y":100,"width":306,"height":614,"radii":{"tl":0,"tr":0,"br":0,"bl":0}},"landscapeScreen":{"x":86,"y":40,"width":614,"height":306}}}];
+const GROUPS = [
+  { id: 'android', label: 'Android Phones', icon: '🤖' },
+  { id: 'apple', label: 'Apple Phones', icon: '' },
+  { id: 'tablet', label: 'Tablets', icon: '▭' },
+  { id: 'special', label: 'Specials', icon: '✦' },
+];
+
+const CUSTOM_KEY = 'rf-custom-devices-v1';
+const GENERIC_FRAME_IDS = {
+  phone: 'non-branded-android-smartphone',
+  tablet: 'apple-ipad-air-4',
+  desktop: 'macbook-air',
+  watch: 'apple-watch-serie-6',
+};
+
+const state = {
+  url: 'https://example.com',
+  selectedId: DEVICES.find(d => d.id === 'apple-iphone-17-2025')?.id || DEVICES[0].id,
+  orientation: 'portrait',
+  framed: true,
+  panelOpen: window.innerWidth > 1180,
+  loading: false,
+  error: '',
+  search: '',
+  shotToken: Date.now(),
+  shotUrl: '',
+  shotNatural: null,
+  captureStream: null,
+  mediaRecorder: null,
+  recordChunks: [],
+  recordLoopId: null,
+  recording: false,
+  backgroundMode: 'soft',
+  zoom: 1,
+  displayShotUrl: '',
+  shotRequestId: 0,
+  exportMenuOpen: false,
+  exportFull: false,
+  exportFormat: 'JPEG',
+  customFormOpen: false,
+  customDevices: loadCustomDevices(),
+};
+
+const els = {
+  urlInput: document.getElementById('urlInput'),
+  goBtn: document.getElementById('goBtn'),
+  openBtn: document.getElementById('openBtn'),
+  toolbarDrawer: document.getElementById('toolbarDrawer'),
+  toolbarFrame: document.getElementById('toolbarFrame'),
+  toolbarRotate: document.getElementById('toolbarRotate'),
+  toolbarReload: document.getElementById('toolbarReload'),
+  toolbarBg: document.getElementById('toolbarBg'),
+  toolbarZoomIn: document.getElementById('toolbarZoomIn'),
+  toolbarZoomOut: document.getElementById('toolbarZoomOut'),
+  toolbarShot: document.getElementById('toolbarShot'),
+  toolbarRecord: document.getElementById('toolbarRecord'),
+  exportMenu: document.getElementById('exportMenu'),
+  exportFull: document.getElementById('exportFull'),
+  exportFormat: document.getElementById('exportFormat'),
+  exportOpen: document.getElementById('exportOpen'),
+  exportClose: document.getElementById('exportClose'),
+  panelHost: document.getElementById('panelHost'),
+  panel: document.getElementById('panel'),
+  closePanel: document.getElementById('closePanel'),
+  addCustomBtn: document.getElementById('addCustomBtn'),
+  customForm: document.getElementById('customForm'),
+  customName: document.getElementById('customName'),
+  customWidth: document.getElementById('customWidth'),
+  customHeight: document.getElementById('customHeight'),
+  customKind: document.getElementById('customKind'),
+  customAdd: document.getElementById('customAdd'),
+  customCancel: document.getElementById('customCancel'),
+  searchInput: document.getElementById('searchInput'),
+  deviceGroups: document.getElementById('deviceGroups'),
+  deviceCount: document.getElementById('deviceCount'),
+  stageTitle: document.getElementById('stageTitle'),
+  stageMeta: document.getElementById('stageMeta'),
+  stageBadgeMode: document.getElementById('stageBadgeMode'),
+  stageBadgeViewport: document.getElementById('stageBadgeViewport'),
+  centerWrap: document.getElementById('centerWrap'),
+  previewWrap: document.getElementById('previewWrap'),
+  helperNote: document.getElementById('helperNote'),
+  loadingLayer: document.getElementById('loadingLayer'),
+  errorLayer: document.getElementById('errorLayer'),
+  errorText: document.getElementById('errorText'),
+  stageBody: document.getElementById('stageBody'),
+  captureVideo: document.getElementById('captureVideo'),
+  recordCanvas: document.getElementById('recordCanvas'),
+};
+
+function baseDevices() {
+  return DEVICES;
+}
+
+function allDevices() {
+  return [...baseDevices(), ...state.customDevices.map(materializeCustomDevice)].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function currentDevice() {
+  return allDevices().find(d => d.id === state.selectedId) || allDevices()[0];
+}
+
+function loadCustomDevices() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CUSTOM_KEY) || '[]');
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCustomDevices() {
+  localStorage.setItem(CUSTOM_KEY, JSON.stringify(state.customDevices));
+}
+
+function materializeCustomDevice(raw) {
+  const templateId = GENERIC_FRAME_IDS[raw.kind] || GENERIC_FRAME_IDS.phone;
+  const template = DEVICES.find(d => d.id === templateId) || DEVICES[0];
+  const group = raw.kind === 'phone' ? 'android' : raw.kind === 'tablet' ? 'tablet' : 'special';
+  return {
+    ...template,
+    id: raw.id,
+    name: raw.name,
+    brand: 'Custom',
+    kind: raw.kind,
+    group,
+    custom: true,
+    viewport: { width: Number(raw.width), height: Number(raw.height) },
+  };
+}
+
+function normalizeUrl(value) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return 'https://example.com';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+function uaForDevice() {
+  return 'desktop_chrome';
+}
+
+function buildApiShotUrl(device, options = {}) {
+  const portrait = state.orientation === 'portrait';
+  const width = portrait ? device.viewport.width : device.viewport.height;
+  const height = portrait ? device.viewport.height : device.viewport.width;
+  const scaledWidth = Math.min(Math.max(width * 2, width), device.kind === 'desktop' ? 1600 : 1200);
+  const params = new URLSearchParams({
+    url: normalizeUrl(state.url),
+    width: String(width),
+    height: String(height),
+    zoom: '100',
+    scaled_width: String(scaledWidth),
+    format: options.format || 'JPEG',
+    user_agent: uaForDevice(device),
+    full_size: options.full ? 'true' : 'false',
+    _t: String(options.cacheBust || state.shotToken),
+  });
+  return `https://shot.dktczn.workers.dev/api/screenshot?${params.toString()}`;
+}
+
+function shotUrlFor(device) {
+  return buildApiShotUrl(device, { format: 'JPEG', full: false, cacheBust: state.shotToken });
+}
+
+function syncTopbar() {
+  els.urlInput.value = state.url;
+  els.openBtn.href = normalizeUrl(state.url);
+}
+
+function updateToolbarStates() {
+  els.toolbarDrawer.classList.toggle('active', state.panelOpen);
+  els.toolbarFrame.classList.toggle('active', state.framed);
+  els.toolbarRotate.classList.toggle('active', state.orientation === 'landscape');
+  els.toolbarBg.classList.toggle('active', state.backgroundMode === 'checker');
+  els.toolbarZoomIn.classList.toggle('active', state.zoom > 1.01);
+  els.toolbarZoomOut.classList.toggle('active', state.zoom < 0.99);
+  els.toolbarShot.classList.toggle('active', state.exportMenuOpen);
+  els.toolbarRecord.classList.toggle('recording', state.recording);
+}
+
+function updatePanelState() {
+  els.panelHost.classList.toggle('panel-hidden', !state.panelOpen);
+  els.customForm.classList.toggle('hidden', !state.customFormOpen);
+}
+
+function updateExportMenu() {
+  els.exportMenu.classList.toggle('hidden', !state.exportMenuOpen);
+  els.exportFull.value = state.exportFull ? 'true' : 'false';
+  els.exportFormat.value = state.exportFormat;
+}
+
+function renderDeviceGroups() {
+  const term = state.search.toLowerCase();
+  els.deviceGroups.innerHTML = '';
+  let visibleCount = 0;
+
+  GROUPS.forEach(group => {
+    const items = allDevices().filter(device => {
+      if (device.group !== group.id) return false;
+      if (!term) return true;
+      return `${device.name} ${device.brand}`.toLowerCase().includes(term);
+    });
+    if (!items.length) return;
+    visibleCount += items.length;
+
+    const section = document.createElement('section');
+    section.className = 'group';
+    section.innerHTML = `<div class="group-title"><span>${group.icon}</span><strong>${group.label}</strong></div>`;
+
+    const grid = document.createElement('div');
+    grid.className = 'device-grid';
+
+    items.forEach(device => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'device-card' + (device.id === state.selectedId ? ' active' : '') + (device.custom ? ' custom' : '');
+      btn.innerHTML = `<img src="${device.frame.image}" alt="${escapeHtml(device.name)}" loading="lazy" draggable="false"><span class="label">${escapeHtml(shortName(device.name))}</span>`;
+      btn.addEventListener('click', () => {
+        state.selectedId = device.id;
+        if (window.innerWidth <= 1180) state.panelOpen = false;
+        state.exportMenuOpen = false;
+        refreshShot(true);
+      });
+      grid.appendChild(btn);
+    });
+
+    section.appendChild(grid);
+    els.deviceGroups.appendChild(section);
+  });
+
+  els.deviceCount.textContent = `${visibleCount} devices`;
+}
+
+function shortName(name) {
+  return name
+    .replace(/^Apple\s+/i, '')
+    .replace(/^Samsung\s+/i, '')
+    .replace(/^Google\s+/i, '')
+    .replace(/^Huawei\s+/i, '')
+    .replace(/^Motorola\s+/i, '')
+    .replace(/^Microsoft\s+/i, '')
+    .replace(/^Mockup\s+/i, '');
+}
+
+
+function refreshStageMeta() {
+  const device = currentDevice();
+  const width = state.orientation === 'portrait' ? device.viewport.width : device.viewport.height;
+  const height = state.orientation === 'portrait' ? device.viewport.height : device.viewport.width;
+  els.stageTitle.textContent = device.name;
+  els.stageMeta.textContent = `${device.brand} · ${device.kind} · ${state.orientation}`;
+  els.stageBadgeMode.textContent = state.framed ? 'Frame on' : 'Frame off';
+  els.stageBadgeViewport.textContent = `${width} × ${height}`;
+}
+
+function screenRadiusPx(device, renderedWidth, renderedHeight) {
+  const minSide = Math.min(renderedWidth, renderedHeight);
+  if (device.kind === 'desktop') return Math.max(8, Math.min(18, minSide * 0.03));
+  if (device.kind === 'tablet') return Math.max(12, Math.min(22, minSide * 0.05));
+  if (device.kind === 'watch') return Math.max(10, Math.min(20, minSide * 0.18));
+  return Math.max(14, Math.min(34, minSide * 0.09));
+}
+
+function renderPreviewShell() {
+  const device = currentDevice();
+  const portrait = state.orientation === 'portrait';
+  const metrics = portrait
+    ? { frameWidth: device.frame.frameWidth, frameHeight: device.frame.frameHeight, screen: device.frame.screen }
+    : { frameWidth: device.frame.frameHeight, frameHeight: device.frame.frameWidth, screen: device.frame.landscapeScreen };
+
+  const stageRect = els.centerWrap.getBoundingClientRect();
+  const baseWidth = state.framed ? metrics.frameWidth : (portrait ? device.viewport.width : device.viewport.height);
+  const baseHeight = state.framed ? metrics.frameHeight : (portrait ? device.viewport.height : device.viewport.width);
+  const availableW = Math.max(160, Math.min(stageRect.width - (window.innerWidth <= 760 ? 18 : 40), window.innerWidth - (window.innerWidth <= 760 ? 92 : 140)));
+  const availableH = Math.max(220, Math.min(stageRect.height - (window.innerWidth <= 760 ? 18 : 40), window.innerHeight - (window.innerWidth <= 760 ? 150 : 170)));
+  const fitScale = Math.max(0.1, Math.min(availableW / baseWidth, availableH / baseHeight));
+  const scale = fitScale * state.zoom;
+  const finalW = Math.max(100, Math.round(baseWidth * scale));
+  const finalH = Math.max(100, Math.round(baseHeight * scale));
+  const shotWidth = portrait ? device.viewport.width : device.viewport.height;
+  const shotHeight = portrait ? device.viewport.height : device.viewport.width;
+
+  els.centerWrap.style.minWidth = `${finalW + 24}px`;
+  els.centerWrap.style.minHeight = `${finalH + 24}px`;
+
+  const shot = document.createElement('img');
+  shot.id = 'shotImage';
+  shot.alt = '';
+  shot.crossOrigin = 'anonymous';
+  shot.decoding = 'async';
+  shot.referrerPolicy = 'no-referrer';
+  shot.width = shotWidth;
+  shot.height = shotHeight;
+  attachShotEvents(shot, state.shotUrl);
+
+  els.previewWrap.innerHTML = '';
+
+  if (state.framed) {
+    const shell = document.createElement('div');
+    shell.className = 'preview-shell';
+    shell.style.width = `${finalW}px`;
+    shell.style.height = `${finalH}px`;
+
+    const screen = document.createElement('div');
+    screen.className = 'preview-screen';
+    const renderedScreenWidth = metrics.screen.width * scale;
+    const renderedScreenHeight = metrics.screen.height * scale;
+    screen.style.left = `${metrics.screen.x * scale}px`;
+    screen.style.top = `${metrics.screen.y * scale}px`;
+    screen.style.width = `${renderedScreenWidth}px`;
+    screen.style.height = `${renderedScreenHeight}px`;
+    screen.style.borderRadius = `${screenRadiusPx(device, renderedScreenWidth, renderedScreenHeight)}px`;
+    screen.appendChild(shot);
+
+    const frame = document.createElement('img');
+    frame.className = 'preview-frame' + (portrait ? '' : ' rotated');
+    frame.alt = `${device.name} frame`;
+    frame.src = device.frame.image;
+    if (!portrait) {
+      frame.style.width = `${device.frame.frameWidth * scale}px`;
+      frame.style.height = `${device.frame.frameHeight * scale}px`;
+    }
+
+    shell.append(screen, frame);
+    els.previewWrap.appendChild(shell);
+  } else {
+    const shell = document.createElement('div');
+    shell.className = 'preview-shell no-frame';
+
+    const flat = document.createElement('div');
+    flat.className = 'preview-flat';
+    flat.style.width = `${finalW}px`;
+    flat.style.height = `${finalH}px`;
+    flat.appendChild(shot);
+    shell.appendChild(flat);
+    els.previewWrap.appendChild(shell);
+  }
+}
+
+function attachShotEvents(img, requestedUrl) {
+  state.error = '';
+  const requestId = ++state.shotRequestId;
+
+  if (!state.displayShotUrl) {
+    state.loading = true;
+    updateOverlay();
+    img.addEventListener('load', () => {
+      if (requestId !== state.shotRequestId) return;
+      img.classList.add('is-ready');
+      state.displayShotUrl = requestedUrl;
+      state.loading = false;
+      state.error = '';
+      state.shotNatural = { width: img.naturalWidth, height: img.naturalHeight };
+      updateOverlay();
+    }, { once: true });
+    img.addEventListener('error', () => {
+      if (requestId !== state.shotRequestId) return;
+      state.loading = false;
+      state.error = 'Screenshot API failed. Reload or open API URL.';
+      img.removeAttribute('src');
+      updateOverlay();
+    }, { once: true });
+    img.src = requestedUrl;
+    return;
+  }
+
+  img.src = state.displayShotUrl;
+  img.classList.add('is-ready');
+
+  if (state.displayShotUrl === requestedUrl) {
+    state.loading = false;
+    updateOverlay();
+    return;
+  }
+
+  state.loading = true;
+  updateOverlay();
+  const preloader = new Image();
+  preloader.crossOrigin = 'anonymous';
+  preloader.referrerPolicy = 'no-referrer';
+  preloader.onload = () => {
+    if (requestId !== state.shotRequestId) return;
+    state.displayShotUrl = requestedUrl;
+    img.src = requestedUrl;
+    img.classList.add('is-ready');
+    state.loading = false;
+    state.error = '';
+    state.shotNatural = { width: preloader.naturalWidth, height: preloader.naturalHeight };
+    updateOverlay();
+  };
+  preloader.onerror = () => {
+    if (requestId !== state.shotRequestId) return;
+    state.loading = false;
+    state.error = 'Screenshot API failed. Reload or open API URL.';
+    updateOverlay();
+  };
+  preloader.src = requestedUrl;
+}
+
+function updateOverlay() {
+  els.loadingLayer.classList.add('hidden');
+  els.errorLayer.classList.toggle('hidden', !state.error);
+  els.errorText.textContent = state.error;
+}
+
+function refreshShot(reRenderDevices = false) {
+  state.url = normalizeUrl(els.urlInput.value || state.url);
+  state.shotToken = Date.now();
+  state.shotUrl = shotUrlFor(currentDevice());
+  syncTopbar();
+  refreshStageMeta();
+  renderPreviewShell();
+  updateToolbarStates();
+  updatePanelState();
+  updateExportMenu();
+  if (reRenderDevices) renderDeviceGroups();
+}
+
+function toggleBackground() {
+  state.backgroundMode = state.backgroundMode === 'soft' ? 'checker' : 'soft';
+  els.stageBody.classList.toggle('checker', state.backgroundMode === 'checker');
+  updateToolbarStates();
+}
+
+async function ensureCaptureStream() {
+  if (state.captureStream?.active) return state.captureStream;
+  const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: false });
+  state.captureStream = stream;
+  els.captureVideo.srcObject = stream;
+  await els.captureVideo.play();
+  const [track] = stream.getVideoTracks();
+  if (track) track.addEventListener('ended', () => disconnectCapture());
+  return stream;
+}
+
+function disconnectCapture() {
+  if (state.recording) stopRecording();
+  if (state.captureStream) state.captureStream.getTracks().forEach(track => track.stop());
+  state.captureStream = null;
+  els.captureVideo.srcObject = null;
+}
+
+function getCropForElement(element) {
+  const rect = element.getBoundingClientRect();
+  const vv = window.visualViewport || { width: window.innerWidth, height: window.innerHeight };
+  const scaleX = els.captureVideo.videoWidth / vv.width;
+  const scaleY = els.captureVideo.videoHeight / vv.height;
+  return {
+    sx: Math.max(0, rect.left * scaleX),
+    sy: Math.max(0, rect.top * scaleY),
+    sw: Math.max(1, rect.width * scaleX),
+    sh: Math.max(1, rect.height * scaleY),
+    width: Math.max(1, Math.round(rect.width * scaleX)),
+    height: Math.max(1, Math.round(rect.height * scaleY)),
+  };
+}
+
+async function waitForVideoFrame() {
+  await ensureCaptureStream();
+  if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
+    await new Promise(resolve => els.captureVideo.requestVideoFrameCallback(() => resolve()));
+  } else {
+    await new Promise(resolve => setTimeout(resolve, 120));
+  }
+}
+
+async function takeStageShot() {
+  await waitForVideoFrame();
+  const crop = getCropForElement(document.getElementById('stageCaptureTarget'));
+  const canvas = document.createElement('canvas');
+  canvas.width = crop.width;
+  canvas.height = crop.height;
+  canvas.getContext('2d').drawImage(els.captureVideo, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, canvas.width, canvas.height);
+  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+  downloadBlob(blob, `device-stage-${timestamp()}.png`);
+}
+
+async function startRecording() {
+  await waitForVideoFrame();
+  const crop = getCropForElement(document.getElementById('stageCaptureTarget'));
+  const scale = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  const canvas = els.recordCanvas;
+  canvas.width = Math.round(crop.width * scale);
+  canvas.height = Math.round(crop.height * scale);
+  const ctx = canvas.getContext('2d');
+  const stream = canvas.captureStream(30);
+  const mimeType = getBestRecordingMimeType();
+  const recorder = mimeType ? new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 }) : new MediaRecorder(stream, { videoBitsPerSecond: 8_000_000 });
+  state.mediaRecorder = recorder;
+  state.recordChunks = [];
+  state.recording = true;
+  updateToolbarStates();
+
+  recorder.ondataavailable = event => { if (event.data && event.data.size > 0) state.recordChunks.push(event.data); };
+  recorder.onstop = () => {
+    const mime = recorder.mimeType || 'video/webm';
+    const ext = mime.includes('mp4') ? 'mp4' : 'webm';
+    const blob = new Blob(state.recordChunks, { type: mime });
+    downloadBlob(blob, `device-stage-${timestamp()}.${ext}`);
+    state.recordChunks = [];
+    state.mediaRecorder = null;
+    state.recording = false;
+    updateToolbarStates();
+  };
+
+  const draw = () => {
+    if (!state.recording) return;
+    const freshCrop = getCropForElement(document.getElementById('stageCaptureTarget'));
+    ctx.drawImage(els.captureVideo, freshCrop.sx, freshCrop.sy, freshCrop.sw, freshCrop.sh, 0, 0, canvas.width, canvas.height);
+    state.recordLoopId = requestAnimationFrame(draw);
+  };
+  draw();
+  recorder.start(250);
+}
+
+function stopRecording() {
+  state.recording = false;
+  if (state.recordLoopId) cancelAnimationFrame(state.recordLoopId);
+  state.recordLoopId = null;
+  if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') state.mediaRecorder.stop();
+  updateToolbarStates();
+}
+
+function getBestRecordingMimeType() {
+  const candidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+  return candidates.find(type => MediaRecorder.isTypeSupported(type)) || '';
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function openExportUrl() {
+  state.exportFull = els.exportFull.value === 'true';
+  state.exportFormat = els.exportFormat.value;
+  const url = buildApiShotUrl(currentDevice(), { full: state.exportFull, format: state.exportFormat, cacheBust: Date.now() });
+  window.open(url, '_blank', 'noopener,noreferrer');
+  state.exportMenuOpen = false;
+  updateExportMenu();
+  updateToolbarStates();
+}
+
+function addCustomDevice() {
+  const name = (els.customName.value || '').trim();
+  const width = Number(els.customWidth.value);
+  const height = Number(els.customHeight.value);
+  const kind = els.customKind.value;
+  if (!name || !width || !height || width < 100 || height < 100) {
+    alert('Enter device name, width, and height.');
+    return;
+  }
+  const raw = {
+    id: `custom-${Date.now()}`,
+    name,
+    width,
+    height,
+    kind,
+  };
+  state.customDevices.push(raw);
+  saveCustomDevices();
+  state.selectedId = raw.id;
+  state.customFormOpen = false;
+  els.customName.value = '';
+  els.customWidth.value = '';
+  els.customHeight.value = '';
+  renderDeviceGroups();
+  refreshShot();
+}
+
+function timestamp() {
+  const now = new Date();
+  const pad = value => String(value).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function bindEvents() {
+  els.urlInput.addEventListener('keydown', event => {
+    if (event.key === 'Enter') refreshShot();
+  });
+  els.goBtn.addEventListener('click', () => refreshShot());
+  els.toolbarDrawer.addEventListener('click', () => {
+    state.panelOpen = !state.panelOpen;
+    state.exportMenuOpen = false;
+    updatePanelState();
+    updateExportMenu();
+    updateToolbarStates();
+  });
+  els.closePanel.addEventListener('click', () => {
+    state.panelOpen = false;
+    updatePanelState();
+    updateToolbarStates();
+  });
+  els.toolbarFrame.addEventListener('click', () => {
+    state.framed = !state.framed;
+    renderPreviewShell();
+    refreshStageMeta();
+    updateToolbarStates();
+  });
+  els.toolbarRotate.addEventListener('click', () => {
+    state.orientation = state.orientation === 'portrait' ? 'landscape' : 'portrait';
+    refreshShot();
+  });
+  els.toolbarReload.addEventListener('click', () => refreshShot());
+  els.toolbarBg.addEventListener('click', toggleBackground);
+  els.toolbarZoomIn.addEventListener('click', () => {
+    state.zoom = Math.min(2.5, Number((state.zoom + 0.15).toFixed(2)));
+    renderPreviewShell();
+    updateToolbarStates();
+  });
+  els.toolbarZoomOut.addEventListener('click', () => {
+    state.zoom = Math.max(0.55, Number((state.zoom - 0.15).toFixed(2)));
+    renderPreviewShell();
+    updateToolbarStates();
+  });
+  els.toolbarShot.addEventListener('click', () => {
+    state.exportMenuOpen = !state.exportMenuOpen;
+    updateExportMenu();
+    updateToolbarStates();
+  });
+  els.exportOpen.addEventListener('click', openExportUrl);
+  els.exportClose.addEventListener('click', () => {
+    state.exportMenuOpen = false;
+    updateExportMenu();
+    updateToolbarStates();
+  });
+  els.toolbarRecord.addEventListener('click', async () => {
+    try {
+      state.exportMenuOpen = false;
+      updateExportMenu();
+      if (state.recording) stopRecording();
+      else await startRecording();
+    } catch (error) {
+      console.error(error);
+      alert('Allow screen sharing and choose this tab for recording.');
+    }
+  });
+  els.searchInput.addEventListener('input', () => {
+    state.search = els.searchInput.value.trim();
+    renderDeviceGroups();
+  });
+  els.addCustomBtn.addEventListener('click', () => {
+    state.customFormOpen = !state.customFormOpen;
+    updatePanelState();
+  });
+  els.customCancel.addEventListener('click', () => {
+    state.customFormOpen = false;
+    updatePanelState();
+  });
+  els.customAdd.addEventListener('click', addCustomDevice);
+  document.addEventListener('click', (event) => {
+    const insideShotButton = event.target.closest && event.target.closest('#toolbarShot');
+    if (state.exportMenuOpen && !els.exportMenu.contains(event.target) && !insideShotButton) {
+      state.exportMenuOpen = false;
+      updateExportMenu();
+      updateToolbarStates();
+    }
+  });
+
+  let drag = null;
+  els.stageBody.addEventListener('pointerdown', (event) => {
+    drag = { x: event.clientX, y: event.clientY, left: els.stageBody.scrollLeft, top: els.stageBody.scrollTop };
+    els.stageBody.setPointerCapture?.(event.pointerId);
+  });
+  els.stageBody.addEventListener('pointermove', (event) => {
+    if (!drag) return;
+    els.stageBody.scrollLeft = drag.left - (event.clientX - drag.x);
+    els.stageBody.scrollTop = drag.top - (event.clientY - drag.y);
+  });
+  const stopDrag = () => { drag = null; };
+  els.stageBody.addEventListener('pointerup', stopDrag);
+  els.stageBody.addEventListener('pointercancel', stopDrag);
+  els.stageBody.addEventListener('wheel', (event) => {
+    if (!event.ctrlKey && !event.metaKey) return;
+    event.preventDefault();
+    const delta = event.deltaY < 0 ? 0.12 : -0.12;
+    state.zoom = Math.max(0.55, Math.min(2.5, Number((state.zoom + delta).toFixed(2))));
+    renderPreviewShell();
+    updateToolbarStates();
+  }, { passive: false });
+
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 1180 && !state.panelOpen) {
+      state.panelOpen = true;
+      updatePanelState();
+      updateToolbarStates();
+    }
+    renderPreviewShell();
+  });
+  if (window.ResizeObserver) {
+    new ResizeObserver(() => renderPreviewShell()).observe(els.centerWrap);
+  }
+}
+
+function init() {
+  bindEvents();
+  state.url = normalizeUrl(state.url);
+  if (els.helperNote) els.helperNote.classList.add('hidden');
+  syncTopbar();
+  renderDeviceGroups();
+  updatePanelState();
+  updateToolbarStates();
+  updateExportMenu();
+  refreshShot();
+}
+
+init();
+</script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3fe71b80aa547e2',t:'MTc5MDIxNzgzNA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
 
