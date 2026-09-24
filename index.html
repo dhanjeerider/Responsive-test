@@ -229,20 +229,21 @@ img { display: block; }
   overflow: hidden;
   background: #fff;
 }
-.preview-screen img,
-.preview-flat img {
+.preview-screen iframe,
+.preview-flat iframe {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  object-position: top center;
-  user-select: none;
-  -webkit-user-drag: none;
-  opacity: 0;
-  transition: opacity .16s ease;
+  border: 0;
+  background: #fff;
 }
-.preview-screen img.is-ready,
-.preview-flat img.is-ready {
-  opacity: 1;
+.preview-screen::after,
+.preview-flat::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.05);
 }
 .preview-frame {
   position: absolute;
@@ -660,9 +661,6 @@ const state = {
   loading: false,
   error: '',
   search: '',
-  shotToken: Date.now(),
-  shotUrl: '',
-  shotNatural: null,
   captureStream: null,
   mediaRecorder: null,
   recordChunks: [],
@@ -670,8 +668,8 @@ const state = {
   recording: false,
   backgroundMode: 'soft',
   zoom: 1,
-  displayShotUrl: '',
-  shotRequestId: 0,
+  liveIframe: null,
+  liveIframeKey: '',
   exportMenuOpen: false,
   exportFull: false,
   exportFormat: 'JPEG',
@@ -792,13 +790,9 @@ function buildApiShotUrl(device, options = {}) {
     format: options.format || 'JPEG',
     user_agent: uaForDevice(device),
     full_size: options.full ? 'true' : 'false',
-    _t: String(options.cacheBust || state.shotToken),
+    _t: String(options.cacheBust || Date.now()),
   });
   return `https://shot.dktczn.workers.dev/api/screenshot?${params.toString()}`;
-}
-
-function shotUrlFor(device) {
-  return buildApiShotUrl(device, { format: 'JPEG', full: false, cacheBust: state.shotToken });
 }
 
 function syncTopbar() {
@@ -900,6 +894,39 @@ function screenRadiusPx(device, renderedWidth, renderedHeight) {
   return Math.max(14, Math.min(34, minSide * 0.09));
 }
 
+function buildPreviewUrl() {
+  return normalizeUrl(state.url);
+}
+
+function buildPreviewIframe(viewportWidth, viewportHeight, renderedWidth, renderedHeight) {
+  const key = buildPreviewUrl();
+  if (!state.liveIframe || state.liveIframeKey !== key) {
+    const iframe = document.createElement('iframe');
+    iframe.src = buildPreviewUrl();
+    iframe.loading = 'eager';
+    iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+    iframe.allow = 'fullscreen';
+    iframe.addEventListener('error', () => {
+      state.error = 'This site may block iframe preview. Use Open tab or screenshot API export.';
+      updateOverlay();
+    });
+    iframe.addEventListener('load', () => {
+      state.error = '';
+      updateOverlay();
+    });
+    state.liveIframe = iframe;
+    state.liveIframeKey = key;
+  }
+  const iframe = state.liveIframe;
+  iframe.width = viewportWidth;
+  iframe.height = viewportHeight;
+  iframe.style.width = `${viewportWidth}px`;
+  iframe.style.height = `${viewportHeight}px`;
+  iframe.style.transformOrigin = 'top left';
+  iframe.style.transform = `scale(${renderedWidth / viewportWidth}, ${renderedHeight / viewportHeight})`;
+  return iframe;
+}
+
 function renderPreviewShell() {
   const device = currentDevice();
   const portrait = state.orientation === 'portrait';
@@ -916,22 +943,11 @@ function renderPreviewShell() {
   const scale = fitScale * state.zoom;
   const finalW = Math.max(100, Math.round(baseWidth * scale));
   const finalH = Math.max(100, Math.round(baseHeight * scale));
-  const shotWidth = portrait ? device.viewport.width : device.viewport.height;
-  const shotHeight = portrait ? device.viewport.height : device.viewport.width;
+  const viewportWidth = portrait ? device.viewport.width : device.viewport.height;
+  const viewportHeight = portrait ? device.viewport.height : device.viewport.width;
 
   els.centerWrap.style.minWidth = `${finalW + 24}px`;
   els.centerWrap.style.minHeight = `${finalH + 24}px`;
-
-  const shot = document.createElement('img');
-  shot.id = 'shotImage';
-  shot.alt = '';
-  shot.crossOrigin = 'anonymous';
-  shot.decoding = 'async';
-  shot.referrerPolicy = 'no-referrer';
-  shot.width = shotWidth;
-  shot.height = shotHeight;
-  attachShotEvents(shot, state.shotUrl);
-
   els.previewWrap.innerHTML = '';
 
   if (state.framed) {
@@ -949,7 +965,7 @@ function renderPreviewShell() {
     screen.style.width = `${renderedScreenWidth}px`;
     screen.style.height = `${renderedScreenHeight}px`;
     screen.style.borderRadius = `${screenRadiusPx(device, renderedScreenWidth, renderedScreenHeight)}px`;
-    screen.appendChild(shot);
+    screen.appendChild(buildPreviewIframe(viewportWidth, viewportHeight, renderedScreenWidth, renderedScreenHeight));
 
     const frame = document.createElement('img');
     frame.className = 'preview-frame' + (portrait ? '' : ' rotated');
@@ -970,70 +986,11 @@ function renderPreviewShell() {
     flat.className = 'preview-flat';
     flat.style.width = `${finalW}px`;
     flat.style.height = `${finalH}px`;
-    flat.appendChild(shot);
+    flat.style.borderRadius = `${screenRadiusPx(device, finalW, finalH)}px`;
+    flat.appendChild(buildPreviewIframe(viewportWidth, viewportHeight, finalW, finalH));
     shell.appendChild(flat);
     els.previewWrap.appendChild(shell);
   }
-}
-
-function attachShotEvents(img, requestedUrl) {
-  state.error = '';
-  const requestId = ++state.shotRequestId;
-
-  if (!state.displayShotUrl) {
-    state.loading = true;
-    updateOverlay();
-    img.addEventListener('load', () => {
-      if (requestId !== state.shotRequestId) return;
-      img.classList.add('is-ready');
-      state.displayShotUrl = requestedUrl;
-      state.loading = false;
-      state.error = '';
-      state.shotNatural = { width: img.naturalWidth, height: img.naturalHeight };
-      updateOverlay();
-    }, { once: true });
-    img.addEventListener('error', () => {
-      if (requestId !== state.shotRequestId) return;
-      state.loading = false;
-      state.error = 'Screenshot API failed. Reload or open API URL.';
-      img.removeAttribute('src');
-      updateOverlay();
-    }, { once: true });
-    img.src = requestedUrl;
-    return;
-  }
-
-  img.src = state.displayShotUrl;
-  img.classList.add('is-ready');
-
-  if (state.displayShotUrl === requestedUrl) {
-    state.loading = false;
-    updateOverlay();
-    return;
-  }
-
-  state.loading = true;
-  updateOverlay();
-  const preloader = new Image();
-  preloader.crossOrigin = 'anonymous';
-  preloader.referrerPolicy = 'no-referrer';
-  preloader.onload = () => {
-    if (requestId !== state.shotRequestId) return;
-    state.displayShotUrl = requestedUrl;
-    img.src = requestedUrl;
-    img.classList.add('is-ready');
-    state.loading = false;
-    state.error = '';
-    state.shotNatural = { width: preloader.naturalWidth, height: preloader.naturalHeight };
-    updateOverlay();
-  };
-  preloader.onerror = () => {
-    if (requestId !== state.shotRequestId) return;
-    state.loading = false;
-    state.error = 'Screenshot API failed. Reload or open API URL.';
-    updateOverlay();
-  };
-  preloader.src = requestedUrl;
 }
 
 function updateOverlay() {
@@ -1044,8 +1001,6 @@ function updateOverlay() {
 
 function refreshShot(reRenderDevices = false) {
   state.url = normalizeUrl(els.urlInput.value || state.url);
-  state.shotToken = Date.now();
-  state.shotUrl = shotUrlFor(currentDevice());
   syncTopbar();
   refreshStageMeta();
   renderPreviewShell();
@@ -1333,17 +1288,16 @@ function bindEvents() {
     updateToolbarStates();
   }, { passive: false });
 
+  let resizeTimer = null;
   window.addEventListener('resize', () => {
     if (window.innerWidth > 1180 && !state.panelOpen) {
       state.panelOpen = true;
       updatePanelState();
       updateToolbarStates();
     }
-    renderPreviewShell();
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => renderPreviewShell(), 140);
   });
-  if (window.ResizeObserver) {
-    new ResizeObserver(() => renderPreviewShell()).observe(els.centerWrap);
-  }
 }
 
 function init() {
@@ -1360,6 +1314,5 @@ function init() {
 
 init();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3fe71b80aa547e2',t:'MTc5MDIxNzgzNA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3fe81fd0f3ddccb',t:'MTc5MDIxODUwMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
-
